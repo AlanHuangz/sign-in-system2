@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>補習班補課名單產生器</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        select, input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        .checkbox-group { border: 1px solid #ccc; padding: 15px; border-radius: 5px; max-height: 200px; overflow-y: auto; background-color: #fafafa; }
+        .checkbox-item { margin-bottom: 10px; display: flex; align-items: center; }
+        .checkbox-item input { margin-right: 10px; transform: scale(1.2); }
+        button { width: 100%; padding: 12px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        button:hover { background-color: #45a049; }
+        .result-box { margin-top: 20px; }
+        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; resize: vertical; box-sizing: border-box;}
+        .loading { text-align: center; color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>影片補課鎖檔清單產生器</h2>
+    
+    <div id="loadingStatus" class="loading">正在從資料庫載入班級資料...</div>
+
+    <div id="mainForm" style="display:none;">
+        <div class="form-group">
+            <label>補課日期</label>
+            <input type="date" id="dateSelect">
+        </div>
+
+        <div class="form-group">
+            <label>年級</label>
+            <select id="gradeSelect">
+                <option value="">請選擇年級</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>班級</label>
+            <select id="classSelect" disabled>
+                <option value="">請先選擇年級</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>缺課學生 (可複選)</label>
+            <div id="studentCheckboxes" class="checkbox-group">
+                <div style="color:#999; text-align:center;">請先選擇班級</div>
+            </div>
+        </div>
+
+        <button onclick="generateEmails()">產生 YT 授權信箱字串</button>
+
+        <div class="result-box">
+            <label>請複製以下信箱貼至 YouTube：</label>
+            <textarea id="emailOutput" readonly placeholder="產生的信箱會顯示在這裡..."></textarea>
+            <button onclick="copyToClipboard()" style="background-color: #008CBA; margin-top: 5px;">一鍵複製</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ⚠️ 貼上你在 GAS 部署的 Web App 網址
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyX4b2skbjzoc5URO2mljwleVuVtVH_gO6qivm-9LeySDEJoIBi15u6f38ruzl-GEJ8/exec'; 
+    
+    let dbData = {};
+
+    // 網頁載入時向 GAS 要資料
+    window.onload = function() {
+        document.getElementById('dateSelect').valueAsDate = new Date(); // 預設今天
+
+        fetch(GAS_URL)
+            .then(response => response.json())
+            .then(data => {
+                dbData = data;
+                initGradeSelect();
+                document.getElementById('loadingStatus').style.display = 'none';
+                document.getElementById('mainForm').style.display = 'block';
+            })
+            .catch(error => {
+                document.getElementById('loadingStatus').innerText = '載入失敗，請檢查網路或 GAS 網址是否正確。';
+                console.error('Error:', error);
+            });
+    };
+
+    // 初始化年級選單
+    function initGradeSelect() {
+        const gradeSelect = document.getElementById('gradeSelect');
+        const grades = Object.keys(dbData.classData);
+        grades.forEach(grade => {
+            let option = document.createElement('option');
+            option.value = grade;
+            option.textContent = grade;
+            gradeSelect.appendChild(option);
+        });
+    }
+
+    // 當年級改變時，連動班級選單
+    document.getElementById('gradeSelect').addEventListener('change', function() {
+        const classSelect = document.getElementById('classSelect');
+        const studentCheckboxes = document.getElementById('studentCheckboxes');
+        const selectedGrade = this.value;
+
+        classSelect.innerHTML = '<option value="">請選擇班級</option>';
+        studentCheckboxes.innerHTML = '<div style="color:#999; text-align:center;">請先選擇班級</div>';
+        document.getElementById('emailOutput').value = '';
+
+        if (selectedGrade) {
+            classSelect.disabled = false;
+            const classes = Object.keys(dbData.classData[selectedGrade]);
+            classes.forEach(cls => {
+                let option = document.createElement('option');
+                option.value = cls;
+                option.textContent = cls;
+                classSelect.appendChild(option);
+            });
+        } else {
+            classSelect.disabled = true;
+        }
+    });
+
+    // 當班級改變時，產生學生 Checkbox
+    document.getElementById('classSelect').addEventListener('change', function() {
+        const studentCheckboxes = document.getElementById('studentCheckboxes');
+        const selectedGrade = document.getElementById('gradeSelect').value;
+        const selectedClass = this.value;
+
+        studentCheckboxes.innerHTML = '';
+        document.getElementById('emailOutput').value = '';
+
+        if (selectedClass) {
+            const students = dbData.classData[selectedGrade][selectedClass];
+            students.forEach(student => {
+                let div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `<input type="checkbox" id="student_${student}" value="${student}"> 
+                                 <label for="student_${student}" style="margin:0; font-weight:normal;">${student}</label>`;
+                studentCheckboxes.appendChild(div);
+            });
+        } else {
+            studentCheckboxes.innerHTML = '<div style="color:#999; text-align:center;">請先選擇班級</div>';
+        }
+    });
+
+    // 產生信箱字串
+    function generateEmails() {
+        const checkboxes = document.querySelectorAll('#studentCheckboxes input[type="checkbox"]:checked');
+        const outputArea = document.getElementById('emailOutput');
+        
+        if (checkboxes.length === 0) {
+            alert('請至少勾選一位缺課學生！');
+            return;
+        }
+
+        let emails = [];
+        let missingEmails = []; // 紀錄找不到信箱的學生
+
+        checkboxes.forEach(cb => {
+            let studentName = cb.value;
+            let email = dbData.studentEmails[studentName];
+            if (email) {
+                emails.push(email);
+            } else {
+                missingEmails.push(studentName);
+            }
+        });
+
+        if (missingEmails.length > 0) {
+            alert(`警告：以下學生在「工作表一」找不到對應的 Gmail：\n${missingEmails.join(', ')}`);
+        }
+
+        outputArea.value = emails.join(', ');
+    }
+
+    // 一鍵複製功能
+    function copyToClipboard() {
+        const copyText = document.getElementById("emailOutput");
+        if(!copyText.value) return;
+        
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); // 給手機版使用
+        navigator.clipboard.writeText(copyText.value).then(() => {
+            alert("✅ 信箱已複製！現在可以貼到 YouTube 私人影片授權名單中了。");
+        });
+    }
+</script>
+
+</body>
+</html>
