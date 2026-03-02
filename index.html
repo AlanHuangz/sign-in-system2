@@ -3,65 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>補習班補課名單產生器</title>
+    <title>補習班影片授權與缺課系統</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; }
+        .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        
+        /* 頁籤樣式 */
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+        .tab-btn { flex: 1; padding: 10px; text-align: center; cursor: pointer; background: none; border: none; font-size: 16px; font-weight: bold; color: #777; transition: 0.3s; }
+        .tab-btn.active { color: #4CAF50; border-bottom: 3px solid #4CAF50; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-        select, input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        select, input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;}
         .checkbox-group { border: 1px solid #ccc; padding: 15px; border-radius: 5px; max-height: 200px; overflow-y: auto; background-color: #fafafa; }
         .checkbox-item { margin-bottom: 10px; display: flex; align-items: center; }
         .checkbox-item input { margin-right: 10px; transform: scale(1.2); }
         button { width: 100%; padding: 12px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px; }
         button:hover { background-color: #45a049; }
+        
+        /* 紀錄表格樣式 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        
         .result-box { margin-top: 20px; }
-        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; resize: vertical; box-sizing: border-box;}
+        textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; resize: vertical; box-sizing: border-box;}
         .loading { text-align: center; color: #666; font-style: italic; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>影片補課鎖檔清單產生器</h2>
+    <h2>影片授權與缺課系統</h2>
     
-    <div id="loadingStatus" class="loading">正在從資料庫載入班級資料...</div>
+    <div id="loadingStatus" class="loading">正在與資料庫同步中，請稍候...</div>
 
-    <div id="mainForm" style="display:none;">
-        <div class="form-group">
-            <label>補課日期</label>
-            <input type="date" id="dateSelect">
+    <div id="mainApp" style="display:none;">
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('generateTab', this)">📝 新增鎖檔授權</button>
+            <button class="tab-btn" onclick="switchTab('historyTab', this)">📂 缺課歷史紀錄</button>
         </div>
 
-        <div class="form-group">
-            <label>年級</label>
-            <select id="gradeSelect">
-                <option value="">請選擇年級</option>
-            </select>
-        </div>
+        <div id="generateTab" class="tab-content active">
+            <div class="form-group">
+                <label>補課日期</label>
+                <input type="date" id="dateSelect">
+            </div>
+            <div class="form-group">
+                <label>年級</label>
+                <select id="gradeSelect"><option value="">請選擇年級</option></select>
+            </div>
+            <div class="form-group">
+                <label>班級</label>
+                <select id="classSelect" disabled><option value="">請先選擇年級</option></select>
+            </div>
+            <div class="form-group">
+                <label>缺課學生 (可複選)</label>
+                <div id="studentCheckboxes" class="checkbox-group">
+                    <div style="color:#999; text-align:center;">請先選擇班級</div>
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label>班級</label>
-            <select id="classSelect" disabled>
-                <option value="">請先選擇年級</option>
-            </select>
-        </div>
+            <button onclick="processAndRecord()" id="submitBtn">產生授權信箱 並 寫入缺課紀錄</button>
 
-        <div class="form-group">
-            <label>缺課學生 (可複選)</label>
-            <div id="studentCheckboxes" class="checkbox-group">
-                <div style="color:#999; text-align:center;">請先選擇班級</div>
+            <div class="result-box">
+                <label>請複製以下信箱貼至 YouTube：</label>
+                <textarea id="emailOutput" readonly placeholder="產生的信箱會顯示在這裡..."></textarea>
+                <button onclick="copyToClipboard()" style="background-color: #008CBA; margin-top: 5px;">一鍵複製</button>
             </div>
         </div>
 
-        <button onclick="generateEmails()">產生 YT 授權信箱字串</button>
-
-        <div class="result-box">
-            <label>請複製以下信箱貼至 YouTube：</label>
-            <textarea id="emailOutput" readonly placeholder="產生的信箱會顯示在這裡..."></textarea>
-            <button onclick="copyToClipboard()" style="background-color: #008CBA; margin-top: 5px;">一鍵複製</button>
+        <div id="historyTab" class="tab-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>班級</th>
+                        <th>缺席名單</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    </tbody>
+            </table>
         </div>
+
     </div>
 </div>
 
@@ -71,7 +101,6 @@
     
     let dbData = {};
 
-    // 網頁載入時向 GAS 要資料
     window.onload = function() {
         document.getElementById('dateSelect').valueAsDate = new Date(); // 預設今天
 
@@ -80,16 +109,23 @@
             .then(data => {
                 dbData = data;
                 initGradeSelect();
+                renderHistoryTable();
                 document.getElementById('loadingStatus').style.display = 'none';
-                document.getElementById('mainForm').style.display = 'block';
+                document.getElementById('mainApp').style.display = 'block';
             })
             .catch(error => {
-                document.getElementById('loadingStatus').innerText = '載入失敗，請檢查網路或 GAS 網址是否正確。';
-                console.error('Error:', error);
+                document.getElementById('loadingStatus').innerText = '載入失敗，請檢查網路或 GAS 網址。';
             });
     };
 
-    // 初始化年級選單
+    // 頁籤切換邏輯
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btnElement.classList.add('active');
+    }
+
     function initGradeSelect() {
         const gradeSelect = document.getElementById('gradeSelect');
         const grades = Object.keys(dbData.classData);
@@ -101,7 +137,6 @@
         });
     }
 
-    // 當年級改變時，連動班級選單
     document.getElementById('gradeSelect').addEventListener('change', function() {
         const classSelect = document.getElementById('classSelect');
         const studentCheckboxes = document.getElementById('studentCheckboxes');
@@ -113,8 +148,7 @@
 
         if (selectedGrade) {
             classSelect.disabled = false;
-            const classes = Object.keys(dbData.classData[selectedGrade]);
-            classes.forEach(cls => {
+            Object.keys(dbData.classData[selectedGrade]).forEach(cls => {
                 let option = document.createElement('option');
                 option.value = cls;
                 option.textContent = cls;
@@ -125,7 +159,6 @@
         }
     });
 
-    // 當班級改變時，產生學生 Checkbox
     document.getElementById('classSelect').addEventListener('change', function() {
         const studentCheckboxes = document.getElementById('studentCheckboxes');
         const selectedGrade = document.getElementById('gradeSelect').value;
@@ -135,58 +168,109 @@
         document.getElementById('emailOutput').value = '';
 
         if (selectedClass) {
-            const students = dbData.classData[selectedGrade][selectedClass];
-            students.forEach(student => {
+            dbData.classData[selectedGrade][selectedClass].forEach(student => {
                 let div = document.createElement('div');
                 div.className = 'checkbox-item';
                 div.innerHTML = `<input type="checkbox" id="student_${student}" value="${student}"> 
                                  <label for="student_${student}" style="margin:0; font-weight:normal;">${student}</label>`;
                 studentCheckboxes.appendChild(div);
             });
-        } else {
-            studentCheckboxes.innerHTML = '<div style="color:#999; text-align:center;">請先選擇班級</div>';
         }
     });
 
-    // 產生信箱字串
-    function generateEmails() {
+    // 處理產生信箱並將紀錄送到 GAS
+    function processAndRecord() {
+        const dateVal = document.getElementById('dateSelect').value;
+        const gradeVal = document.getElementById('gradeSelect').value;
+        const classVal = document.getElementById('classSelect').value;
         const checkboxes = document.querySelectorAll('#studentCheckboxes input[type="checkbox"]:checked');
         const outputArea = document.getElementById('emailOutput');
+        const submitBtn = document.getElementById('submitBtn');
         
+        if (!dateVal || !gradeVal || !classVal) {
+            alert('請確保日期、年級、班級都有選擇！'); return;
+        }
         if (checkboxes.length === 0) {
-            alert('請至少勾選一位缺課學生！');
-            return;
+            alert('請至少勾選一位缺課學生！'); return;
         }
 
         let emails = [];
-        let missingEmails = []; // 紀錄找不到信箱的學生
+        let absentStudents = [];
 
         checkboxes.forEach(cb => {
             let studentName = cb.value;
+            absentStudents.push(studentName);
             let email = dbData.studentEmails[studentName];
-            if (email) {
-                emails.push(email);
-            } else {
-                missingEmails.push(studentName);
-            }
+            if (email) emails.push(email);
         });
 
-        if (missingEmails.length > 0) {
-            alert(`警告：以下學生在「工作表一」找不到對應的 Gmail：\n${missingEmails.join(', ')}`);
-        }
-
+        // 1. 產生信箱字串供複製
         outputArea.value = emails.join(', ');
+
+        // 2. 打包資料準備寫入試算表
+        const payload = {
+            action: 'addRecord',
+            date: dateVal,
+            grade: gradeVal,
+            className: classVal,
+            students: absentStudents.join(', ')
+        };
+
+        // UI 狀態改變，防止重複點擊
+        submitBtn.disabled = true;
+        submitBtn.innerText = "紀錄儲存中...";
+
+        // 3. 透過 POST 傳送給 GAS
+        fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            submitBtn.innerText = "✅ 產生成功並已歸檔！";
+            alert('信箱已產生，且缺課紀錄已同步至資料庫！');
+            
+            // 將新紀錄暫時加到前端的歷史紀錄表中，不用重新整理畫面也能看到
+            const newRowHtml = `<tr><td>${dateVal}</td><td>${gradeVal} - ${classVal}</td><td>${absentStudents.join(', ')}</td></tr>`;
+            document.getElementById('historyTableBody').insertAdjacentHTML('afterbegin', newRowHtml);
+            
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "產生授權信箱 並 寫入缺課紀錄";
+            }, 3000);
+        })
+        .catch(error => {
+            alert('儲存紀錄時發生錯誤，但信箱已產生。');
+            submitBtn.disabled = false;
+            submitBtn.innerText = "產生授權信箱 並 寫入缺課紀錄";
+        });
     }
 
-    // 一鍵複製功能
+    function renderHistoryTable() {
+        const tbody = document.getElementById('historyTableBody');
+        if(!dbData.historyData || dbData.historyData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">目前尚無紀錄</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        dbData.historyData.forEach(record => {
+            html += `<tr>
+                        <td>${record.date}</td>
+                        <td>${record.grade} - ${record.className}</td>
+                        <td>${record.students}</td>
+                     </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
     function copyToClipboard() {
         const copyText = document.getElementById("emailOutput");
         if(!copyText.value) return;
-        
         copyText.select();
-        copyText.setSelectionRange(0, 99999); // 給手機版使用
+        copyText.setSelectionRange(0, 99999);
         navigator.clipboard.writeText(copyText.value).then(() => {
-            alert("✅ 信箱已複製！現在可以貼到 YouTube 私人影片授權名單中了。");
+            alert("✅ 信箱已複製！");
         });
     }
 </script>
