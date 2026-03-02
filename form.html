@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>補習班資料填寫系統</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 15px; margin: 0; }
+        .container { max-width: 500px; margin: 20px auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-top: 0; margin-bottom: 20px; font-size: 22px; }
+        
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+        .tab-btn { flex: 1; padding: 12px 5px; text-align: center; cursor: pointer; background: none; border: none; font-size: 16px; font-weight: bold; color: #777; transition: 0.3s; }
+        .tab-btn.active { color: #2196F3; border-bottom: 3px solid #2196F3; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; font-size: 15px; }
+        input[type="text"], input[type="email"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        
+        button { width: 100%; padding: 14px; background-color: #2196F3; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        button:hover { background-color: #1976D2; }
+        
+        .notice { background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; font-size: 14px; margin-bottom: 20px; border-left: 4px solid #ffeeba; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📝 學生資料服務網</h2>
+    
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('newStudentTab', this)">👶 新生資料填寫</button>
+        <button class="tab-btn" onclick="switchTab('updateEmailTab', this)">📧 修改信箱(舊生)</button>
+    </div>
+
+    <div id="newStudentTab" class="tab-content active">
+        <div class="notice">
+            歡迎加入！請家長協助填寫學生的基本資料，以便日後開通線上補課影片權限。
+        </div>
+        <div class="form-group">
+            <label>學生姓名</label>
+            <input type="text" id="newName" placeholder="請輸入學生真實姓名">
+        </div>
+        <div class="form-group">
+            <label>觀看影片用 Gmail 信箱</label>
+            <input type="email" id="newEmail" placeholder="例如：student@gmail.com">
+        </div>
+        <button onclick="submitNewStudent()" id="btnNew">送出資料</button>
+    </div>
+
+    <div id="updateEmailTab" class="tab-content">
+        <div class="notice">
+            若您需要更換補課用的 YouTube 觀看帳號，請在此重新提交。
+        </div>
+        <div class="form-group">
+            <label>學生姓名</label>
+            <input type="text" id="updateName" placeholder="請輸入學生真實姓名">
+        </div>
+        <div class="form-group">
+            <label>新的 Gmail 信箱</label>
+            <input type="email" id="updateEmail" placeholder="請輸入新的 Gmail 帳號">
+        </div>
+        <button onclick="submitUpdateEmail()" id="btnUpdate">確認修改</button>
+    </div>
+</div>
+
+<script>
+    // ⚠️ 請填入你的 GAS Web App URL
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyX4b2skbjzoc5URO2mljwleVuVtVH_gO6qivm-9LeySDEJoIBi15u6f38ruzl-GEJ8/exec'; 
+
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btnElement.classList.add('active');
+    }
+
+    // 提交新生資料
+    function submitNewStudent() {
+        const name = document.getElementById('newName').value.trim();
+        const email = document.getElementById('newEmail').value.trim();
+        const btn = document.getElementById('btnNew');
+
+        if(!name || !email) { alert("⚠️ 姓名與信箱為必填欄位！"); return; }
+        if(!email.includes('@gmail.com')) { alert("⚠️ 請務必填寫 @gmail.com 結尾的 Google 信箱，否則無法觀看影片喔！"); return; }
+
+        const payload = { action: 'addStudent', name: name, email: email };
+        btn.disabled = true; btn.innerText = "資料傳送中...";
+
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(response => response.json())
+        .then(data => {
+            alert("✅ 資料已成功送出！老師將會為您建檔。");
+            document.getElementById('newName').value = '';
+            document.getElementById('newEmail').value = '';
+            btn.disabled = false; btn.innerText = "送出資料";
+        })
+        .catch(error => {
+            alert("❌ 傳送失敗，請檢查網路連線或稍後再試。");
+            btn.disabled = false; btn.innerText = "送出資料";
+        });
+    }
+
+    // 提交修改信箱
+    function submitUpdateEmail() {
+        const name = document.getElementById('updateName').value.trim();
+        const email = document.getElementById('updateEmail').value.trim();
+        const btn = document.getElementById('btnUpdate');
+
+        if(!name || !email) { alert("⚠️ 姓名與新信箱為必填欄位！"); return; }
+        if(!email.includes('@gmail.com')) { alert("⚠️ 請務必填寫 @gmail.com 結尾的 Google 信箱！"); return; }
+
+        const payload = { action: 'updateEmail', name: name, email: email };
+        btn.disabled = true; btn.innerText = "修改傳送中...";
+
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'success') {
+                alert(`✅ 已成功將 ${name} 的信箱更新為 ${email}！`);
+                document.getElementById('updateName').value = '';
+                document.getElementById('updateEmail').value = '';
+            } else {
+                alert(`❌ 找不到名為「${name}」的學生資料，請確認姓名是否輸入正確（需與當初報名時完全相同）。`);
+            }
+            btn.disabled = false; btn.innerText = "確認修改";
+        })
+        .catch(error => {
+            alert("❌ 傳送失敗，請檢查網路連線或稍後再試。");
+            btn.disabled = false; btn.innerText = "確認修改";
+        });
+    }
+</script>
+
+</body>
+</html>
