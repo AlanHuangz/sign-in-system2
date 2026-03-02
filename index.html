@@ -17,7 +17,7 @@
 
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-        select, input[type="text"], input[type="email"], input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;}
+        select, input[type="text"], input[type="email"], input[type="date"], input[list] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;}
         .checkbox-group { border: 1px solid #ccc; padding: 15px; border-radius: 5px; max-height: 200px; overflow-y: auto; background-color: #fafafa; }
         .checkbox-item { margin-bottom: 10px; display: flex; align-items: center; }
         .checkbox-item input { margin-right: 10px; transform: scale(1.2); }
@@ -32,7 +32,6 @@
         textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; resize: vertical; box-sizing: border-box;}
         .loading { text-align: center; color: #666; font-style: italic; }
         
-        /* 管理區塊分隔線 */
         .management-section { border: 1px solid #eee; padding: 20px; border-radius: 8px; margin-bottom: 20px; background-color: #fafafa; }
         .management-section h3 { margin-top: 0; color: #2196F3; }
     </style>
@@ -104,16 +103,19 @@
             <div class="management-section">
                 <h3>2. 將學生編入班級 (工作表二)</h3>
                 <div class="form-group">
-                    <label>選擇學生</label>
-                    <select id="assignStudentSelect"><option value="">請選擇學生</option></select>
+                    <label>選擇學生 (點擊輸入框可直接搜尋姓名)</label>
+                    <input list="studentDatalist" id="assignStudentInput" placeholder="請輸入關鍵字或選擇學生...">
+                    <datalist id="studentDatalist"></datalist>
                 </div>
                 <div class="form-group">
-                    <label>輸入或選擇年級</label>
-                    <input type="text" id="assignGrade" placeholder="例如：國一 (可輸入新建立的年級)">
+                    <label>選擇或輸入年級</label>
+                    <input list="gradeDatalist" id="assignGradeInput" placeholder="例如：國一、會考...">
+                    <datalist id="gradeDatalist"></datalist>
                 </div>
                 <div class="form-group">
-                    <label>輸入或選擇班級</label>
-                    <input type="text" id="assignClass" placeholder="例如：數學A班 (可輸入新建立的班級)">
+                    <label>選擇或輸入班級</label>
+                    <input list="classDatalist" id="assignClassInput" placeholder="請選擇或輸入班級...">
+                    <datalist id="classDatalist"></datalist>
                 </div>
                 <button onclick="assignStudentToClass()" id="btnAssignClass" style="background-color: #2196F3;">確認編入班級</button>
             </div>
@@ -133,7 +135,6 @@
         loadData();
     };
 
-    // 統整資料載入功能，方便新增資料後重新整理
     function loadData() {
         document.getElementById('loadingStatus').style.display = 'block';
         document.getElementById('mainApp').style.display = 'none';
@@ -143,7 +144,7 @@
             .then(data => {
                 dbData = data;
                 initGradeSelect();
-                initAssignStudentSelect();
+                initDatalists(); // 改呼叫這個新函數
                 renderHistoryTable();
                 document.getElementById('loadingStatus').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
@@ -160,7 +161,6 @@
         btnElement.classList.add('active');
     }
 
-    // 初始化下拉選單 (授權頁面)
     function initGradeSelect() {
         const gradeSelect = document.getElementById('gradeSelect');
         gradeSelect.innerHTML = '<option value="">請選擇年級</option>';
@@ -172,17 +172,46 @@
         });
     }
 
-    // 初始化學生總表下拉選單 (編班頁面)
-    function initAssignStudentSelect() {
-        const select = document.getElementById('assignStudentSelect');
-        select.innerHTML = '<option value="">請選擇學生</option>';
+    // --- 新增：初始化所有可搜尋下拉選單 (Datalist) ---
+    function initDatalists() {
+        // 1. 學生搜尋選單
+        const studentDatalist = document.getElementById('studentDatalist');
+        studentDatalist.innerHTML = '';
         if(dbData.allStudents) {
             dbData.allStudents.forEach(name => {
                 let option = document.createElement('option');
-                option.value = name; option.textContent = name;
-                select.appendChild(option);
+                option.value = name;
+                studentDatalist.appendChild(option);
             });
         }
+
+        // 2. 年級與班級選單
+        const gradeDatalist = document.getElementById('gradeDatalist');
+        const classDatalist = document.getElementById('classDatalist');
+        
+        let existingGrades = new Set(['國一', '國二', '國三', '會考']); // 預設選項
+        let existingClasses = new Set();
+
+        if(dbData.classData) {
+            Object.keys(dbData.classData).forEach(grade => {
+                existingGrades.add(grade);
+                Object.keys(dbData.classData[grade]).forEach(cls => {
+                    existingClasses.add(cls);
+                });
+            });
+        }
+
+        gradeDatalist.innerHTML = '';
+        existingGrades.forEach(g => {
+            let option = document.createElement('option');
+            option.value = g; gradeDatalist.appendChild(option);
+        });
+
+        classDatalist.innerHTML = '';
+        existingClasses.forEach(c => {
+            let option = document.createElement('option');
+            option.value = c; classDatalist.appendChild(option);
+        });
     }
 
     document.getElementById('gradeSelect').addEventListener('change', function() {
@@ -222,7 +251,6 @@
         }
     });
 
-    // 處理產生信箱與寫入缺課紀錄
     function processAndRecord() {
         const dateVal = document.getElementById('dateSelect').value;
         const gradeVal = document.getElementById('gradeSelect').value;
@@ -257,7 +285,7 @@
         .then(response => response.json())
         .then(data => {
             submitBtn.innerText = "✅ 產生成功並已歸檔！";
-            loadData(); // 背景重新抓取最新資料
+            loadData(); 
             setTimeout(() => { submitBtn.disabled = false; submitBtn.innerText = "產生授權信箱 並 寫入缺課紀錄"; }, 3000);
         });
     }
@@ -274,7 +302,6 @@
         tbody.innerHTML = html;
     }
 
-    // --- 新增學生功能 ---
     function addNewStudent() {
         const name = document.getElementById('newStudentName').value.trim();
         const email = document.getElementById('newStudentEmail').value.trim();
@@ -292,15 +319,15 @@
             document.getElementById('newStudentName').value = '';
             document.getElementById('newStudentEmail').value = '';
             btn.disabled = false; btn.innerText = "確認新增學生";
-            loadData(); // 重新載入資料以更新下拉選單
+            loadData(); 
         });
     }
 
-    // --- 學生編班功能 ---
     function assignStudentToClass() {
-        const name = document.getElementById('assignStudentSelect').value;
-        const grade = document.getElementById('assignGrade').value.trim();
-        const className = document.getElementById('assignClass').value.trim();
+        // 改為讀取 input 的 value
+        const name = document.getElementById('assignStudentInput').value.trim();
+        const grade = document.getElementById('assignGradeInput').value.trim();
+        const className = document.getElementById('assignClassInput').value.trim();
         const btn = document.getElementById('btnAssignClass');
 
         if(!name || !grade || !className) { alert("請選擇學生並填寫年級與班級！"); return; }
@@ -312,11 +339,11 @@
         .then(response => response.json())
         .then(data => {
             alert(`✅ 已成功將 ${name} 編入 ${grade} ${className}！`);
-            document.getElementById('assignStudentSelect').value = '';
-            document.getElementById('assignGrade').value = '';
-            document.getElementById('assignClass').value = '';
+            document.getElementById('assignStudentInput').value = '';
+            document.getElementById('assignGradeInput').value = '';
+            document.getElementById('assignClassInput').value = '';
             btn.disabled = false; btn.innerText = "確認編入班級";
-            loadData(); // 重新載入資料以更新下拉選單
+            loadData(); 
         });
     }
 
@@ -324,9 +351,4 @@
         const copyText = document.getElementById("emailOutput");
         if(!copyText.value) return;
         copyText.select(); copyText.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已複製！"); });
-    }
-</script>
-
-</body>
-</html>
+        navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已
