@@ -351,4 +351,9 @@
         const copyText = document.getElementById("emailOutput");
         if(!copyText.value) return;
         copyText.select(); copyText.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已
+        navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已複製！"); });
+    }
+</script>
+
+</body>
+</html>
