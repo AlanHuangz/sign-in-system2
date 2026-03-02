@@ -75,6 +75,18 @@
                 <textarea id="emailOutput" readonly placeholder="產生的信箱會顯示在這裡..."></textarea>
                 <button onclick="copyToClipboard()" style="background-color: #008CBA; margin-top: 5px;">一鍵複製</button>
             </div>
+            <div class="management-section">
+                <h3>3. 修改現有學生的 Gmail (工作表一)</h3>
+                <div class="form-group">
+                    <label>選擇學生 (可搜尋)</label>
+                    <input list="studentDatalist" id="updateStudentInput" placeholder="請輸入關鍵字或選擇學生...">
+                </div>
+                <div class="form-group">
+                    <label>輸入新的 Gmail</label>
+                    <input type="email" id="updateStudentEmail" placeholder="例如：new_email@gmail.com">
+                </div>
+                <button onclick="updateStudentEmail()" id="btnUpdateEmail" style="background-color: #FF9800;">確認修改信箱</button>
+            </div>
         </div>
 
         <div id="historyTab" class="tab-content">
@@ -354,6 +366,35 @@
         navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已複製！"); });
     }
 </script>
+// --- 修改學生信箱功能 ---
+    function updateStudentEmail() {
+        const name = document.getElementById('updateStudentInput').value.trim();
+        const newEmail = document.getElementById('updateStudentEmail').value.trim();
+        const btn = document.getElementById('btnUpdateEmail');
+
+        if(!name || !newEmail) { alert("請選擇學生並填寫新信箱！"); return; }
+
+        const payload = { action: 'updateEmail', name: name, email: newEmail };
+        btn.disabled = true; btn.innerText = "修改中...";
+
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'success') {
+                alert(`✅ 已成功將 ${name} 的信箱更新為 ${newEmail}！`);
+                document.getElementById('updateStudentInput').value = '';
+                document.getElementById('updateStudentEmail').value = '';
+                loadData(); // 重新載入最新資料
+            } else {
+                alert(`❌ 修改失敗：${data.message}`);
+            }
+            btn.disabled = false; btn.innerText = "確認修改信箱";
+        })
+        .catch(error => {
+            alert("發生錯誤，請檢查網路連線。");
+            btn.disabled = false; btn.innerText = "確認修改信箱";
+        });
+    }
 
 </body>
 </html>
