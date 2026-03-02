@@ -34,6 +34,7 @@
         
         .management-section { border: 1px solid #eee; padding: 20px; border-radius: 8px; margin-bottom: 20px; background-color: #fafafa; }
         .management-section h3 { margin-top: 0; color: #2196F3; }
+        .info-text { font-size: 14px; color: #888; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -103,7 +104,7 @@
             <div class="management-section">
                 <h3>2. 將學生編入班級 (工作表二)</h3>
                 <div class="form-group">
-                    <label>選擇學生 (點擊輸入框可直接搜尋姓名)</label>
+                    <label>選擇學生</label>
                     <input list="studentDatalist" id="assignStudentInput" placeholder="請輸入關鍵字或選擇學生...">
                     <datalist id="studentDatalist"></datalist>
                 </div>
@@ -130,7 +131,28 @@
                     <label>輸入新的 Gmail</label>
                     <input type="email" id="updateStudentEmail" placeholder="例如：new_email@gmail.com">
                 </div>
-                <button onclick="updateStudentEmail()" id="btnUpdateEmail" style="background-color: #FF9800;">確認修改信箱</button>
+                <button onclick="updateStudentEmail()" id="btnUpdateEmail" style="background-color: #FF9800;">確認新增綁定信箱</button>
+            </div>
+
+            <div class="management-section" style="background-color: #eef7e6; border-color: #c5e1a5;">
+                <h3 style="color: #4CAF50;">4. 新增固定鎖檔帳號 (工作表四)</h3>
+                <div class="info-text">將行政人員或科任老師加入，產出信箱時會自動附加在名單後方。</div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>適用範圍</label>
+                    <input list="scopeDatalist" id="fixedScope" placeholder="請選擇或輸入範圍...">
+                    <datalist id="scopeDatalist">
+                        <option value="全校通用">全校通用 (任何班級鎖檔皆會加入)</option>
+                        </datalist>
+                </div>
+                <div class="form-group">
+                    <label>姓名 / 身份</label>
+                    <input type="text" id="fixedName" placeholder="例如：數學張老師、主任">
+                </div>
+                <div class="form-group">
+                    <label>Gmail 信箱</label>
+                    <input type="email" id="fixedEmail" placeholder="例如：teacher@gmail.com">
+                </div>
+                <button onclick="addFixedEmail()" id="btnFixedEmail" style="background-color: #4CAF50;">確認新增固定名單</button>
             </div>
         </div>
 
@@ -191,22 +213,29 @@
         if(dbData.allStudents) {
             dbData.allStudents.forEach(name => {
                 let option = document.createElement('option');
-                option.value = name;
-                studentDatalist.appendChild(option);
+                option.value = name; studentDatalist.appendChild(option);
             });
         }
 
         const gradeDatalist = document.getElementById('gradeDatalist');
         const classDatalist = document.getElementById('classDatalist');
+        const scopeDatalist = document.getElementById('scopeDatalist');
         
         let existingGrades = new Set(['國一', '國二', '國三', '會考']); 
         let existingClasses = new Set();
+
+        // 預設選項，防止清空
+        scopeDatalist.innerHTML = '<option value="全校通用">全校通用 (任何班級鎖檔皆會加入)</option>';
 
         if(dbData.classData) {
             Object.keys(dbData.classData).forEach(grade => {
                 existingGrades.add(grade);
                 Object.keys(dbData.classData[grade]).forEach(cls => {
                     existingClasses.add(cls);
+                    // 同時把班級名稱加入「固定鎖檔」的適用範圍選項
+                    let scopeOption = document.createElement('option');
+                    scopeOption.value = cls;
+                    scopeDatalist.appendChild(scopeOption);
                 });
             });
         }
@@ -272,17 +301,31 @@
         if (!dateVal || !gradeVal || !classVal) { alert('請確保日期、年級、班級都有選擇！'); return; }
         if (checkboxes.length === 0) { alert('請至少勾選一位缺課學生！'); return; }
 
-        let emails = [];
         let absentStudents = [];
+        let finalEmailsSet = new Set(); // 使用 Set 來避免信箱重複
 
+        // 1. 蒐集缺課學生的信箱 (可能有多個信箱，用逗號切開處理)
         checkboxes.forEach(cb => {
             let studentName = cb.value;
             absentStudents.push(studentName);
-            let email = dbData.studentEmails[studentName];
-            if (email) emails.push(email);
+            let emailString = dbData.studentEmails[studentName];
+            if (emailString) {
+                emailString.split(',').forEach(e => finalEmailsSet.add(e.trim()));
+            }
         });
 
-        outputArea.value = emails.join(', ');
+        // 2. ⭐ 自動加入「全校通用」的固定名單
+        if (dbData.fixedEmails && dbData.fixedEmails.global) {
+            dbData.fixedEmails.global.forEach(e => finalEmailsSet.add(e.trim()));
+        }
+
+        // 3. ⭐ 自動加入「該班專屬」的固定名單
+        if (dbData.fixedEmails && dbData.fixedEmails.byClass && dbData.fixedEmails.byClass[classVal]) {
+            dbData.fixedEmails.byClass[classVal].forEach(e => finalEmailsSet.add(e.trim()));
+        }
+
+        // 轉換回字串供複製
+        outputArea.value = Array.from(finalEmailsSet).join(', ');
 
         const payload = {
             action: 'addRecord',
@@ -295,6 +338,7 @@
         .then(response => response.json())
         .then(data => {
             submitBtn.innerText = "✅ 產生成功並已歸檔！";
+            alert('信箱已產生，且缺課紀錄已同步！\n(系統已自動為您加入常態固定鎖檔帳號)');
             loadData(); 
             setTimeout(() => { submitBtn.disabled = false; submitBtn.innerText = "產生授權信箱 並 寫入缺課紀錄"; }, 3000);
         });
@@ -312,24 +356,20 @@
         tbody.innerHTML = html;
     }
 
+    // --- 各種寫入表單邏輯 ---
     function addNewStudent() {
         const name = document.getElementById('newStudentName').value.trim();
         const email = document.getElementById('newStudentEmail').value.trim();
         const btn = document.getElementById('btnAddStudent');
-
         if(!name || !email) { alert("請填寫學生姓名與信箱！"); return; }
-
         const payload = { action: 'addStudent', name: name, email: email };
         btn.disabled = true; btn.innerText = "新增中...";
-
         fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
         .then(response => response.json())
         .then(data => {
             alert("✅ 學生已成功新增至總表！");
-            document.getElementById('newStudentName').value = '';
-            document.getElementById('newStudentEmail').value = '';
-            btn.disabled = false; btn.innerText = "確認新增學生";
-            loadData(); 
+            document.getElementById('newStudentName').value = ''; document.getElementById('newStudentEmail').value = '';
+            btn.disabled = false; btn.innerText = "確認新增學生"; loadData(); 
         });
     }
 
@@ -338,21 +378,15 @@
         const grade = document.getElementById('assignGradeInput').value.trim();
         const className = document.getElementById('assignClassInput').value.trim();
         const btn = document.getElementById('btnAssignClass');
-
         if(!name || !grade || !className) { alert("請選擇學生並填寫年級與班級！"); return; }
-
         const payload = { action: 'assignClass', name: name, grade: grade, className: className };
         btn.disabled = true; btn.innerText = "編班中...";
-
         fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
         .then(response => response.json())
         .then(data => {
             alert(`✅ 已成功將 ${name} 編入 ${grade} ${className}！`);
-            document.getElementById('assignStudentInput').value = '';
-            document.getElementById('assignGradeInput').value = '';
-            document.getElementById('assignClassInput').value = '';
-            btn.disabled = false; btn.innerText = "確認編入班級";
-            loadData(); 
+            document.getElementById('assignStudentInput').value = ''; document.getElementById('assignGradeInput').value = ''; document.getElementById('assignClassInput').value = '';
+            btn.disabled = false; btn.innerText = "確認編入班級"; loadData(); 
         });
     }
 
@@ -360,28 +394,47 @@
         const name = document.getElementById('updateStudentInput').value.trim();
         const newEmail = document.getElementById('updateStudentEmail').value.trim();
         const btn = document.getElementById('btnUpdateEmail');
-
         if(!name || !newEmail) { alert("請選擇學生並填寫新信箱！"); return; }
-
         const payload = { action: 'updateEmail', name: name, email: newEmail };
-        btn.disabled = true; btn.innerText = "修改中...";
-
+        btn.disabled = true; btn.innerText = "綁定中...";
         fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
         .then(response => response.json())
         .then(data => {
             if(data.status === 'success') {
-                alert(`✅ 已成功將 ${name} 的信箱更新為 ${newEmail}！`);
-                document.getElementById('updateStudentInput').value = '';
-                document.getElementById('updateStudentEmail').value = '';
-                loadData(); 
+                alert(`✅ 已成功將 ${newEmail} 綁定至 ${name} 的帳號清單！`);
+                document.getElementById('updateStudentInput').value = ''; document.getElementById('updateStudentEmail').value = ''; loadData(); 
             } else {
-                alert(`❌ 修改失敗：${data.message}`);
+                alert(`❌ 綁定失敗：${data.message}`);
             }
-            btn.disabled = false; btn.innerText = "確認修改信箱";
+            btn.disabled = false; btn.innerText = "確認新增綁定信箱";
+        });
+    }
+
+    // ⭐ 新增：加入固定鎖檔帳號邏輯
+    function addFixedEmail() {
+        const scope = document.getElementById('fixedScope').value.trim();
+        const name = document.getElementById('fixedName').value.trim();
+        const email = document.getElementById('fixedEmail').value.trim();
+        const btn = document.getElementById('btnFixedEmail');
+
+        if(!scope || !name || !email) { alert("請填寫適用範圍、姓名與信箱！"); return; }
+
+        const payload = { action: 'addFixedEmail', scope: scope, name: name, email: email };
+        btn.disabled = true; btn.innerText = "新增中...";
+
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(response => response.json())
+        .then(data => {
+            alert(`✅ 已成功將 ${name} 加入至「${scope}」的固定鎖檔名單中！`);
+            document.getElementById('fixedScope').value = '';
+            document.getElementById('fixedName').value = '';
+            document.getElementById('fixedEmail').value = '';
+            btn.disabled = false; btn.innerText = "確認新增固定名單";
+            loadData(); // 背景重新抓取資料
         })
         .catch(error => {
             alert("發生錯誤，請檢查網路連線。");
-            btn.disabled = false; btn.innerText = "確認修改信箱";
+            btn.disabled = false; btn.innerText = "確認新增固定名單";
         });
     }
 
