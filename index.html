@@ -75,18 +75,6 @@
                 <textarea id="emailOutput" readonly placeholder="產生的信箱會顯示在這裡..."></textarea>
                 <button onclick="copyToClipboard()" style="background-color: #008CBA; margin-top: 5px;">一鍵複製</button>
             </div>
-            <div class="management-section">
-                <h3>3. 修改現有學生的 Gmail (工作表一)</h3>
-                <div class="form-group">
-                    <label>選擇學生 (可搜尋)</label>
-                    <input list="studentDatalist" id="updateStudentInput" placeholder="請輸入關鍵字或選擇學生...">
-                </div>
-                <div class="form-group">
-                    <label>輸入新的 Gmail</label>
-                    <input type="email" id="updateStudentEmail" placeholder="例如：new_email@gmail.com">
-                </div>
-                <button onclick="updateStudentEmail()" id="btnUpdateEmail" style="background-color: #FF9800;">確認修改信箱</button>
-            </div>
         </div>
 
         <div id="historyTab" class="tab-content">
@@ -131,6 +119,19 @@
                 </div>
                 <button onclick="assignStudentToClass()" id="btnAssignClass" style="background-color: #2196F3;">確認編入班級</button>
             </div>
+
+            <div class="management-section">
+                <h3>3. 修改現有學生的 Gmail (工作表一)</h3>
+                <div class="form-group">
+                    <label>選擇學生 (可搜尋)</label>
+                    <input list="studentDatalist" id="updateStudentInput" placeholder="請輸入關鍵字或選擇學生...">
+                </div>
+                <div class="form-group">
+                    <label>輸入新的 Gmail</label>
+                    <input type="email" id="updateStudentEmail" placeholder="例如：new_email@gmail.com">
+                </div>
+                <button onclick="updateStudentEmail()" id="btnUpdateEmail" style="background-color: #FF9800;">確認修改信箱</button>
+            </div>
         </div>
 
     </div>
@@ -156,7 +157,7 @@
             .then(data => {
                 dbData = data;
                 initGradeSelect();
-                initDatalists(); // 改呼叫這個新函數
+                initDatalists(); 
                 renderHistoryTable();
                 document.getElementById('loadingStatus').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
@@ -184,9 +185,7 @@
         });
     }
 
-    // --- 新增：初始化所有可搜尋下拉選單 (Datalist) ---
     function initDatalists() {
-        // 1. 學生搜尋選單
         const studentDatalist = document.getElementById('studentDatalist');
         studentDatalist.innerHTML = '';
         if(dbData.allStudents) {
@@ -197,11 +196,10 @@
             });
         }
 
-        // 2. 年級與班級選單
         const gradeDatalist = document.getElementById('gradeDatalist');
         const classDatalist = document.getElementById('classDatalist');
         
-        let existingGrades = new Set(['國一', '國二', '國三', '會考']); // 預設選項
+        let existingGrades = new Set(['國一', '國二', '國三', '會考']); 
         let existingClasses = new Set();
 
         if(dbData.classData) {
@@ -336,7 +334,6 @@
     }
 
     function assignStudentToClass() {
-        // 改為讀取 input 的 value
         const name = document.getElementById('assignStudentInput').value.trim();
         const grade = document.getElementById('assignGradeInput').value.trim();
         const className = document.getElementById('assignClassInput').value.trim();
@@ -359,14 +356,7 @@
         });
     }
 
-    function copyToClipboard() {
-        const copyText = document.getElementById("emailOutput");
-        if(!copyText.value) return;
-        copyText.select(); copyText.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已複製！"); });
-    }
-</script>
-// --- 修改學生信箱功能 ---
+    // --- 修改學生信箱功能 ---
     function updateStudentEmail() {
         const name = document.getElementById('updateStudentInput').value.trim();
         const newEmail = document.getElementById('updateStudentEmail').value.trim();
@@ -384,7 +374,7 @@
                 alert(`✅ 已成功將 ${name} 的信箱更新為 ${newEmail}！`);
                 document.getElementById('updateStudentInput').value = '';
                 document.getElementById('updateStudentEmail').value = '';
-                loadData(); // 重新載入最新資料
+                loadData(); 
             } else {
                 alert(`❌ 修改失敗：${data.message}`);
             }
@@ -395,6 +385,14 @@
             btn.disabled = false; btn.innerText = "確認修改信箱";
         });
     }
+
+    function copyToClipboard() {
+        const copyText = document.getElementById("emailOutput");
+        if(!copyText.value) return;
+        copyText.select(); copyText.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(copyText.value).then(() => { alert("✅ 信箱已複製！"); });
+    }
+</script>
 
 </body>
 </html>
