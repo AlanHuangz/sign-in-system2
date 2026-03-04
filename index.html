@@ -117,7 +117,7 @@
                 <h3 style="color: #4CAF50;">4. 新增固定鎖檔帳號 (工作表四)</h3>
                 <div class="info-text">將行政人員或科任老師加入，產出信箱時會自動附加在名單後方。</div>
                 <div class="form-group" style="margin-top: 10px;"><label>適用範圍</label><input list="scopeDatalist" id="fixedScope" placeholder="請選擇範圍..."><datalist id="scopeDatalist"></datalist></div>
-                <div class="form-group"><label>姓名 / 身份</label><input type="text" id="fixedName" placeholder="例如：數學張老師、主任"></div>
+                <div class="form-group"><label>姓名 / 身份</label><input type="text" id="fixedName" placeholder="例如：數學張老師、長期請假生王大明"></div>
                 <div class="form-group"><label>Gmail 信箱</label><input type="email" id="fixedEmail" placeholder="例如：teacher@gmail.com"></div>
                 <button onclick="addFixedEmail()" id="btnFixedEmail" style="background-color: #4CAF50;">確認新增固定名單</button>
             </div>
@@ -286,6 +286,7 @@
         let absentStudents = [];
         let finalEmailsSet = new Set();
 
+        // 1. 處理有打勾的學生
         checkboxes.forEach(cb => {
             let studentName = cb.value;
             absentStudents.push(studentName);
@@ -295,11 +296,24 @@
             }
         });
 
-        if (dbData.fixedEmails && dbData.fixedEmails.global) {
-            dbData.fixedEmails.global.forEach(e => finalEmailsSet.add(e.trim()));
+        // 2. ⭐ 處理全校通用固定名單 (排除名字包含「老師」或「主任」的人不寫入紀錄)
+        if (dbData.fixedList && dbData.fixedList.global) {
+            dbData.fixedList.global.forEach(item => {
+                finalEmailsSet.add(item.email.trim());
+                if (!item.name.includes('老師') && !item.name.includes('主任')) {
+                    if (!absentStudents.includes(item.name)) absentStudents.push(item.name);
+                }
+            });
         }
-        if (dbData.fixedEmails && dbData.fixedEmails.byClass && dbData.fixedEmails.byClass[classVal]) {
-            dbData.fixedEmails.byClass[classVal].forEach(e => finalEmailsSet.add(e.trim()));
+
+        // 3. ⭐ 處理班級專屬固定名單 (同樣排除老師)
+        if (dbData.fixedList && dbData.fixedList.byClass && dbData.fixedList.byClass[classVal]) {
+            dbData.fixedList.byClass[classVal].forEach(item => {
+                finalEmailsSet.add(item.email.trim());
+                if (!item.name.includes('老師') && !item.name.includes('主任')) {
+                    if (!absentStudents.includes(item.name)) absentStudents.push(item.name);
+                }
+            });
         }
 
         outputArea.value = Array.from(finalEmailsSet).join(', ');
